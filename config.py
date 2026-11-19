@@ -37,7 +37,7 @@ CODE_MAX_REPAIRS = 2      # retries when the code fails the examples in the prom
 CODE_TIMEOUT_S = 10
 
 # --- Video ---
-VIDEO_FPS = 4             # sample rate before change detection
+VIDEO_FPS = 8             # sample rate before change detection / motion tracking
 VIDEO_FRAME_WIDTH = 448   # width of each frame inside the grid image
-VIDEO_MAX_FRAMES = 9      # frames are tiled into ONE grid image (max 3x3) -> ~1 image worth of tokens
+VIDEO_MAX_FRAMES = 9      # frames are tiled into ONE grid image (max 4x3) -> ~1 image worth of tokens
 VIDEO_CHANGE_FRAC = 0.002 # fraction of pixels that must change to keep a frame

@@ -31,7 +31,7 @@ def _whisper():
 @lru_cache(maxsize=None)
 def _ast():
     from transformers import pipeline
-    return pipeline("audio-classification", model=config.AST_MODEL, top_k=5)
+    return pipeline("audio-classification", model=config.AST_MODEL, top_k=10)
 
 
 def warmup():
@@ -48,8 +48,8 @@ def to_wav16k(path):
 
 
 def classify(samples):
-    preds = _ast()({"raw": samples, "sampling_rate": 16000}, top_k=5)
-    preds = sorted(preds, key=lambda p: p["score"], reverse=True)[:5]
+    preds = _ast()({"raw": samples, "sampling_rate": 16000}, top_k=10)
+    preds = sorted(preds, key=lambda p: p["score"], reverse=True)[:10]
     return [(p["label"], float(p["score"])) for p in preds]
 
 
@@ -100,11 +100,15 @@ def handle(question, path, mode="General"):
         q = q or "What sound is this?"
         answer = llm.chat(
             config.VL_MODEL,
-            "An audio classifier (AudioSet labels) analysed a recording. Its top predictions, "
+            "An audio classifier (AudioSet labels) analysed a recording. Its top 10 predictions, "
             f"with confidence from 0 to 1, are: {sounds}.\n"
-            "Answer the user's question about the recording in plain words. Name the most likely "
-            "sound source first. If the predictions are low-confidence or conflicting, say so briefly. "
-            "Do not invent details the predictions don't support.\n"
+            "Work out the single most likely real-world sound source. Generic labels such as 'Sound "
+            "effect', 'Inside, small room', 'Outside, rural or natural', 'Vehicle', 'Noise' or 'Static' "
+            "describe the setting, not the source: prefer specific labels even with lower scores, and "
+            "combine related labels (e.g. 'Crackle' + 'Fire' = a crackling fire; 'Waves, surf' or 'Ocean' "
+            "= ocean waves; 'Bark' + 'Dog' = a dog barking).\n"
+            "Answer in ONE short sentence that names the sound (e.g. 'This is a dog barking.'). "
+            "Only mention uncertainty if no specific label fits.\n"
             f"Question: {q}",
             system=prompts.system_for(mode),
             think=False,
