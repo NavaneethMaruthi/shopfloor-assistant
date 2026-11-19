@@ -23,25 +23,54 @@ SYSTEM = (
 )
 
 HARNESS = r'''
-import doctest, io, json, sys
+import doctest, io, json, re, sys
 g = {"__name__": "candidate"}
 src = open(sys.argv[1]).read()
 exec(compile(src, "candidate.py", "exec"), g)
 text = open(sys.argv[2]).read()
-# closing triple quotes would otherwise be read as part of the expected output
-text = text.replace('"' * 3, "\n").replace("'" * 3, "\n")
+attempted, failed, report = 0, 0, []
+
+# 1) >>> doctest examples
+dtext = text.replace('"' * 3, "\n").replace("'" * 3, "\n")  # closing quotes aren't expected output
 try:
-    test = doctest.DocTestParser().get_doctest(text, g, "prompt_examples", "prompt", 0)
+    test = doctest.DocTestParser().get_doctest(dtext, g, "prompt_examples", "prompt", 0)
 except ValueError:
     test = None
-if test is None or not test.examples:
-    print("RESULT " + json.dumps({"attempted": 0, "failed": 0}))
-    sys.exit(0)
-buf = io.StringIO()
-runner = doctest.DocTestRunner(optionflags=doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS)
-res = runner.run(test, out=buf.write)
-print(buf.getvalue()[-2000:])
-print("RESULT " + json.dumps({"attempted": res.attempted, "failed": res.failed}))
+if test is not None and test.examples:
+    buf = io.StringIO()
+    res = doctest.DocTestRunner(optionflags=doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS).run(test, out=buf.write)
+    attempted += res.attempted
+    failed += res.failed
+    if res.failed:
+        report.append(buf.getvalue()[-1500:])
+
+# 2) "f(x) == y", "f(x) -> y", "f(x) => y" style examples
+ARROW = re.compile(r"^\s*(?P<call>[A-Za-z_]\w*\(.*\))\s*(?:==|\u279e|=>|\u2192|->)\s*(?P<exp>.+?)\s*$")
+for line in text.splitlines():
+    st = line.strip()
+    if st.startswith(("def ", ">>>", "#")):
+        continue
+    m = ARROW.match(line)
+    if not m:
+        continue
+    try:
+        compile(m["call"], "c", "eval")
+        expected = eval(m["exp"], {})
+    except Exception:
+        continue  # not a checkable example
+    attempted += 1
+    try:
+        got = eval(m["call"], g)
+    except Exception as e:
+        failed += 1
+        report.append(f"{m['call']} raised {e!r}, expected {expected!r}")
+        continue
+    if got != expected:
+        failed += 1
+        report.append(f"{m['call']} returned {got!r}, expected {expected!r}")
+
+print("\n".join(report)[-2000:])
+print("RESULT " + json.dumps({"attempted": attempted, "failed": failed}))
 '''
 
 TYPING_RE = re.compile(r"\b(List|Dict|Tuple|Optional|Any|Union|Set)\[")
@@ -57,7 +86,7 @@ def extract_code(reply):
 
 
 def self_check(code, prompt):
-    """Return (ok, report, n_examples)."""
+    """Return (ok, report, n_examples). Uses only the examples written in the prompt."""
     with tempfile.TemporaryDirectory() as d:
         cpath, ppath, hpath = (os.path.join(d, n) for n in ("candidate.py", "prompt.txt", "harness.py"))
         open(cpath, "w").write(code)

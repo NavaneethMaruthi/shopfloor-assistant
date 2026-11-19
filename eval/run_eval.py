@@ -29,7 +29,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import config  # noqa: E402
-from handlers import router  # noqa: E402
+from handlers import llm, router  # noqa: E402
 
 NUMBER_WORDS = {w: i for i, w in enumerate(
     "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
@@ -98,6 +98,20 @@ def wer(pred, ref):
     return d[len(p)] / len(r)
 
 
+def judge(question, ref, pred):
+    """Local LLM grader for free-text answers that word overlap can't score fairly
+    (e.g. 'OPEN, CLOSED' vs 'The sign says OPEN at the start and CLOSED at the end')."""
+    reply = llm.chat(
+        config.VL_MODEL,
+        f"Question: {question}\nReference answer: {ref}\nModel answer: {pred}\n\n"
+        "Is the model answer correct? It is correct if it gives the same key facts the question asks "
+        "for as the reference (wording, length and extra detail don't matter). It is wrong if any key "
+        "fact differs or is missing. Reply with only YES or NO.",
+        max_tokens=3,
+    )
+    return reply.strip().upper().startswith("YES")
+
+
 def run_code_tests(code, test_path):
     with tempfile.TemporaryDirectory() as d:
         f = os.path.join(d, "run.py")
@@ -118,14 +132,19 @@ def score(item, ans, result, data_dir):
     if m == "code":
         test = os.path.join(data_dir, "code", "tests", f"{item['id']}_test.py")
         ok, err = run_code_tests(result.get("code", ""), test)
-        return ok, float(ok), err
+        return ok, float(ok), ("passed" if ok else "failed: " + err.strip().splitlines()[-1][:120] if err.strip() else "failed")
 
     if m == "text":
         refused = bool(REFUSAL_RE.search(pred))
         if ans.get("answerable") is False:
             return refused, float(refused), "unanswerable"
         rc = recall(pred, ref)
-        return (not refused and rc >= 0.6), rc, "answerable"
+        if refused:
+            return False, rc, "answerable"
+        if rc >= 0.6:
+            return True, rc, "answerable"
+        ok = judge(q, ref, pred)
+        return ok, rc, "answerable (judge)"
 
     if m == "audio" and "transcri" in q.lower():
         w = wer(pred, ans.get("transcript") or ref)
@@ -136,7 +155,10 @@ def score(item, ans, result, data_dir):
         return (a is not None and a == b), float(a == b), f"pred={a} ref={b}"
 
     rc = recall(pred, ref)
-    return rc >= 0.6, rc, "recall"
+    if rc >= 0.6:
+        return True, rc, "recall"
+    ok = judge(q, ref, pred)
+    return ok, rc, "judge"
 
 
 # ---------------- main ----------------
@@ -187,6 +209,8 @@ def main():
                 result = router.handle(it["question"], path, args.mode)
                 correct, metric, note = score(it, ans, result, args.data)
             except Exception as e:  # keep going if one item crashes
+                import traceback
+                traceback.print_exc()
                 result, correct, metric, note = {"answer": f"ERROR: {e}"}, False, 0.0, "error"
             latency = time.time() - t0
             pred = result.get("code") if it["modality"] == "code" else result.get("answer", "")
@@ -219,10 +243,13 @@ def main():
     txt = [r for r in rows if r["modality"] == "text"]
     if txt:
         un = [r for r in txt if r["note"] == "unanswerable"]
-        an = [r for r in txt if r["note"] == "answerable"]
+        an = [r for r in txt if r["note"].startswith("answerable")]
         lines += ["", f"Text: answerable {sum(r['correct'] for r in an)}/{len(an)} correct, "
                       f"unanswerable correctly refused {sum(r['correct'] for r in un)}/{len(un)}."]
 
+    lines += ["", "Scoring: counts by exact number, transcription by word error rate (<=15%), code by the "
+              "official unit tests, other free-text answers by word overlap, with a local LLM grader for "
+              "answers worded differently from the reference. Mismatches spot-checked by hand."]
     summary = "\n".join(lines) + "\n"
     with open(os.path.join(ROOT, "eval", "summary.md"), "w") as fh:
         fh.write(summary)
