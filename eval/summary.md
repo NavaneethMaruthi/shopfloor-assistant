@@ -1,11 +1,15 @@
 # Practice pack results
 
-Run: 20261119_134402 · mode: General · models: qwen3-vl:4b-instruct, qwen2.5-coder:3b, whisper-small, AST
+Run: 20261119_141139 · mode: General · models: qwen3-vl:4b-instruct, qwen2.5-coder:3b, whisper-small, AST
 
 | Modality | Items | Correct | Accuracy | Median latency (s) | Max latency (s) |
 |---|---|---|---|---|---|
-| text | 20 | 19 | 95% | 2.2 | 5.8 |
-| **all** | 20 | 19 | 95% | | |
+| image | 25 | 24 | 96% | 6.8 | 8.3 |
+| audio | 20 | 20 | 100% | 2.6 | 7.7 |
+| text | 20 | 19 | 95% | 2.3 | 6.8 |
+| code | 20 | 17 | 85% | 2.8 | 10.6 |
+| video | 15 | 12 | 80% | 16.1 | 21.4 |
+| **all** | 100 | 92 | 92% | | |
 
 Text: answerable 15/15 correct, unanswerable correctly refused 4/5.
 

@@ -64,19 +64,19 @@ All models are served by **Ollama** (Qwen) or run in-process (Whisper, AST). Off
 
 MacBook Air M4, 16 GB unified memory, fanless. All results below were measured on this machine.
 
-## Test results (practice pack, 100 items)
+## Test results (practice pack, 100 items: 92/100)
 
 | Modality | Items | Accuracy | Median time |
 |---|---|---|---|
-| Image | 25 | 96% | 7.0 s |
-| Audio | 20 | 100% | 2.1 s |
-| Text | 20 | 95% | 2.2 s |
-| Code | 20 | 85% | 3.0 s |
-| Video | 15 | 80% | ~17 s |
+| Image | 25 | 96% | 6.8 s |
+| Audio | 20 | 100% | 2.6 s |
+| Text | 20 | 95% | 2.3 s |
+| Code | 20 | 85% | 2.8 s |
+| Video | 15 | 80% | 16.1 s |
 
 Text: all 15 answerable questions correct; 4 of 5 unanswerable questions correctly refused. The latest full run is written to `eval/summary.md`.
 
-Scoring: counts by exact number, transcription by word error rate (≤15%), code by the official unit tests, other free-text answers by word overlap, with a local LLM grader for answers worded differently from the reference. Mismatches were spot-checked by hand.
+Scoring: counts by exact number, transcription by word error rate (≤15%), code by the official unit tests, other free-text answers by word overlap, with a local LLM grader for answers worded differently from the reference. Mismatches were spot-checked by hand. The final run was measured with Wi-Fi off.
 
 ## Setup
 
