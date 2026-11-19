@@ -23,9 +23,15 @@ SYSTEM = (
     "- Every detail in the question (names, dates, numbers, places) must match the document. "
     "If the document discusses something similar but not exactly what was asked "
     "(for example a different year, person or place), the answer is NOT in the document.\n"
-    '- Reply with JSON only: {"answer": "<short answer>", "quote": "<the exact sentence from the '
-    'document that states the answer>"}\n'
-    '- If the document does not contain the answer, reply: {"answer": "NOT_FOUND", "quote": ""}'
+    "- If several causes, steps or items answer the question, include ALL of them, with one quote "
+    "for each. In a troubleshooting table, every row listed under a problem heading is a possible "
+    "cause of that problem, so list every one of those rows.\n"
+    '  Example: if the document says "Engine Stalls\nNo fuel Refill tank\nClogged filter Replace filter", '
+    'then for "The engine stalls, what should I check?" reply {"answer": "1) No fuel: refill the tank. '
+    '2) Clogged filter: replace the filter.", "quotes": ["No fuel Refill tank", "Clogged filter Replace filter"]}\n'
+    '- Reply with JSON only: {"answer": "<short answer>", "quotes": ["<exact sentence from the '
+    'document that states the answer>", ...]}\n'
+    '- If the document does not contain the answer, reply: {"answer": "NOT_FOUND", "quotes": []}'
 )
 
 
@@ -54,7 +60,11 @@ def _parse(raw):
             data = json.loads(m.group(0))
         except json.JSONDecodeError:
             return None, None
-    return str(data.get("answer", "")).strip(), str(data.get("quote", "")).strip()
+    quotes = data.get("quotes", data.get("quote", []))
+    if isinstance(quotes, str):
+        quotes = [quotes]
+    quotes = [str(q).strip() for q in (quotes or []) if str(q).strip()]
+    return str(data.get("answer", "")).strip(), quotes
 
 
 def _quote_in_doc(quote, doc):
@@ -99,20 +109,23 @@ def handle(question, path, mode="General"):
         json_mode=True,
         think=False,
     )
-    answer, quote = _parse(raw)
+    answer, quotes = _parse(raw)
     not_found = prompts.not_found_message(mode)
 
     if not answer or answer.upper().startswith("NOT_FOUND"):
         return {"answer": not_found, "details": truncated_note.strip(), "grounded": False, "models": config.VL_MODEL}
 
-    if not _quote_in_doc(quote, doc):
-        # model's quote isn't really in the document -> don't trust the answer
+    quotes = [qt for qt in quotes if _quote_in_doc(qt, doc)]
+    if not quotes:
+        # none of the model's quotes is really in the document -> don't trust the answer
         return {"answer": not_found, "details": f"_(Rejected candidate “{answer}”: its quote was not found in the document.)_",
                 "grounded": False, "models": config.VL_MODEL}
+    quote = " | ".join(quotes)
 
     if config.TEXT_VERIFY and not _verify(q, answer, quote):
         return {"answer": not_found, "details": f"_(Rejected candidate “{answer}” with quote “{quote}”: the check said it doesn't answer this question.)_",
                 "grounded": False, "models": config.VL_MODEL}
 
-    return {"answer": answer, "details": f"📄 Source: “{quote}”" + truncated_note, "grounded": True,
+    sources = "\n".join(f"📄 “{qt}”" for qt in quotes)
+    return {"answer": answer, "details": f"Sources:\n{sources}" + truncated_note, "grounded": True,
             "models": config.VL_MODEL}

@@ -205,6 +205,8 @@ def audio_summary(path):
             if len(samples) < 1600 or float(abs(samples).max()) < 1e-3:  # silent track
                 return ""
             labels = audio.classify(samples)
+            if labels[0][1] < 0.2:  # nothing recognisable (quiet room noise) -> say nothing
+                return ""
             text = f"Sounds detected in the video's audio track: " + ", ".join(
                 f"{l} ({sc:.2f})" for l, sc in labels[:5]) + "."
             if audio.is_speech(labels):
