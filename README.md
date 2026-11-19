@@ -16,7 +16,7 @@ One chat interface handles five kinds of input. Attach a file and ask about it; 
 |---|---|---|
 | Image | Describes photos, counts objects, reads text | "What's the rated current on this nameplate?" |
 | Audio | Transcribes speech, answers questions about it, identifies sounds | "What's that sound?" (vacuum cleaner, 0.75 confidence) |
-| Document (PDF/TXT) | Answers from the document only, cites the source line, and says so when the answer isn't there | "The motor is humming loudly. What should I check?" |
+| Document (PDF, Word, TXT, or a zip of them) | Answers from the document only, cites the source line, and says so when the answer isn't there | "The motor is humming loudly. What should I check?" |
 | Code | Writes Python, runs it, and fixes it if it fails | "Flag a motor as overloaded above 115% of full-load amps" |
 | Video | Describes short clips: counting, motion, order of events, signs | "What's happening in this video?" |
 
@@ -68,11 +68,11 @@ MacBook Air M4, 16 GB unified memory, fanless. All results below were measured o
 
 | Modality | Items | Accuracy | Median time |
 |---|---|---|---|
-| Image | 25 | 96% | 6.8 s |
-| Audio | 20 | 100% | 2.6 s |
-| Text | 20 | 95% | 2.3 s |
-| Code | 20 | 85% | 2.8 s |
-| Video | 15 | 80% | 16.1 s |
+| Image | 25 | 96% | 7.0 s |
+| Audio | 20 | 100% | 2.4 s |
+| Text | 20 | 95% | 2.4 s |
+| Code | 20 | 85% | 2.5 s |
+| Video | 15 | 80% | 14.7 s |
 
 Text: all 15 answerable questions correct; 4 of 5 unanswerable questions correctly refused. The latest full run is written to `eval/summary.md`.
 

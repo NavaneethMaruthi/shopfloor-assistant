@@ -274,7 +274,8 @@ def build_ui():
     with gr.Blocks(title="Shopfloor Assistant") as demo:
         gr.Markdown(
             "## 🔧 Shopfloor Assistant\n"
-            "Attach a photo, sound or voice recording, video, or a PDF/TXT document and ask about it, "
+            "Attach a photo, sound or voice recording, video, a PDF, Word or text document, or a zip of them, "
+            "and ask about it, "
             "or ask for Python code. Follow-up questions use the last file you attached. "
             "Runs entirely on this laptop, no internet needed."
         )
@@ -293,7 +294,7 @@ def build_ui():
             chatbot = gr.Chatbot(height=520, label="Assistant")
 
         box_kwargs = dict(
-            file_types=["image", "audio", "video", ".pdf", ".txt", ".heic", ".heif"],
+            file_types=["image", "audio", "video", ".pdf", ".txt", ".md", ".docx", ".zip", ".heic", ".heif"],
             placeholder="Ask a question, attach a file, or record audio…",
             show_label=False,
             label="Message",

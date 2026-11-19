@@ -40,8 +40,25 @@ SYSTEM = (
 )
 
 
+def read_docx(path):
+    """Plain text of a Word .docx (it's a zip of XML), paragraphs and table cells, no extra library."""
+    import zipfile
+    from xml.etree import ElementTree as ET
+    w = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    with zipfile.ZipFile(path) as z:
+        root = ET.fromstring(z.read("word/document.xml"))
+    lines = []
+    for para in root.iter(f"{w}p"):
+        text = "".join(t.text or "" for t in para.iter(f"{w}t"))
+        if text.strip():
+            lines.append(text)
+    return "\n".join(lines)
+
+
 @lru_cache(maxsize=16)
 def load_document(path):
+    if path.lower().endswith(".docx"):
+        return read_docx(path).strip()
     if path.lower().endswith(".pdf"):
         from pypdf import PdfReader
         reader = PdfReader(path)
