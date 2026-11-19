@@ -78,24 +78,32 @@ def session_context(state):
 def respond(message, history, state, mode, read_aloud, voice_questions):
     message = message or {}
     text = (message.get("text") or "").strip()
-    files = message.get("files") or []
-    new_path = _path_of(files[-1]) if files else None
+    files = [p for p in (_path_of(f) for f in (message.get("files") or [])) if p]
     history = list(history or [])
     state = dict(state or {})
     state.setdefault("history", [])
 
-    if not text and not new_path:
+    # Voice question: with 🎤 ticked and nothing typed, a recording is the question and any
+    # other attachment in the same message is what the question is about.
+    recording = None
+    if voice_questions and not text:
+        recs = [p for p in files if router.detect(p) == "audio"]
+        if recs:
+            recording = recs[-1]
+            files = [p for p in files if p != recording]
+    new_path = files[-1] if files else None
+
+    if not text and not new_path and not recording:
         yield history, EMPTY_BOX, state
         return
 
-    # Voice question: a recording with no typed text becomes the question itself.
     spoken = None
-    if voice_questions and new_path and not text and router.detect(new_path) == "audio":
+    if recording:
         history.append({"role": "user", "content": "🎤 …"})
         history.append({"role": "assistant", "content": "⏳ Listening…"})
         yield history, EMPTY_BOX, state
         try:
-            spoken = transcribe_question(new_path)
+            spoken = transcribe_question(recording)
         except Exception as e:
             spoken = ""
             print(f"[voice] transcription failed: {e}")
@@ -105,14 +113,12 @@ def respond(message, history, state, mode, read_aloud, voice_questions):
                                                              "Try again, or type it."})
             yield history, EMPTY_BOX, state
             return
-        text, new_path = spoken, None
+        text = spoken
 
-    if spoken:
-        shown = f"🎤 “{spoken}”"
-    else:
-        shown = f"📎 {os.path.basename(new_path)}" if new_path else ""
-        if text:
-            shown = f"{shown}\n\n{text}" if shown else text
+    shown = f"📎 {os.path.basename(new_path)}" if new_path else ""
+    question_shown = f"🎤 “{spoken}”" if spoken else text
+    if question_shown:
+        shown = f"{shown}\n\n{question_shown}" if shown else question_shown
     history.append({"role": "user", "content": shown})
     history.append({"role": "assistant", "content": "⏳ Working on it…"})
     yield history, EMPTY_BOX, state
