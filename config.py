@@ -13,7 +13,7 @@ DATA_DIR = os.environ.get("DATA_DIR", os.path.join(ROOT, "data"))
 
 # --- Models (all open-weight, all local) ---
 VL_MODEL = os.environ.get("VL_MODEL", "qwen3-vl:4b-instruct")              # image, video, documents, audio Q&A, chat
-CODE_MODEL = os.environ.get("CODE_MODEL", "qwen2.5-coder:7b")     # code (use :3b if memory pressure is high)
+CODE_MODEL = os.environ.get("CODE_MODEL", "qwen2.5-coder:3b")     # code (use :3b if memory pressure is high)
 WHISPER_SIZE = os.environ.get("WHISPER_SIZE", "small")            # speech-to-text
 AST_MODEL = "MIT/ast-finetuned-audioset-10-10-0.4593"             # sound classifier (AudioSet, 527 labels)
 
