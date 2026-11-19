@@ -6,8 +6,13 @@
    (catches near-miss traps like a different year or place).
 Any failure -> "The document does not say."
 """
+import glob
 import json
+import os
 import re
+import shutil
+import subprocess
+import tempfile
 from functools import lru_cache
 
 from rapidfuzz import fuzz
@@ -43,6 +48,51 @@ def load_document(path):
         return "\n".join((p.extract_text() or "") for p in reader.pages).strip()
     with open(path, encoding="utf-8", errors="replace") as f:
         return f.read().strip()
+
+
+def render_pdf_pages(path, max_pages=2):
+    """Render the first pages of a PDF to PNG files (for scanned PDFs with no text layer)."""
+    tmp = tempfile.mkdtemp()
+    try:
+        import fitz  # PyMuPDF, if installed
+        doc = fitz.open(path)
+        out = []
+        for i in range(min(max_pages, len(doc))):
+            p = os.path.join(tmp, f"page{i + 1}.png")
+            doc[i].get_pixmap(dpi=150).save(p)
+            out.append(p)
+        return out
+    except ImportError:
+        pass
+    if shutil.which("pdftoppm"):
+        subprocess.run(["pdftoppm", "-png", "-r", "150", "-l", str(max_pages), path, os.path.join(tmp, "page")],
+                       check=True)
+        return sorted(glob.glob(os.path.join(tmp, "page*.png")))
+    if shutil.which("sips"):  # built into macOS (first page only)
+        p = os.path.join(tmp, "page1.png")
+        subprocess.run(["sips", "-s", "format", "png", path, "--out", p], check=True, capture_output=True)
+        return [p] if os.path.exists(p) else []
+    return []
+
+
+def answer_scanned(question, path, mode):
+    """No text layer: read the page images with the vision model instead."""
+    pages = render_pdf_pages(path)
+    if not pages:
+        return None
+    q = (question or "").strip() or "Summarise this document in a few sentences."
+    answer = llm.chat(
+        config.VL_MODEL,
+        "The image(s) are scanned pages of a document. Read them carefully and answer the question "
+        "using only what is written on the pages. If the pages do not contain the answer, reply exactly: "
+        f"{prompts.not_found_message(mode)}\nQuestion: {q}",
+        system=prompts.system_for(mode),
+        images=[llm.image_bytes(p, max_side=1280) for p in pages],
+        think=False,
+    )
+    return {"answer": answer,
+            "details": f"_(Scanned PDF with no text layer: read {len(pages)} page(s) as images.)_",
+            "models": config.VL_MODEL}
 
 
 def _norm(s):
@@ -94,6 +144,13 @@ def handle(question, path, mode="General", context=""):
         truncated_note = ("\n\n_(Long document: only the first part was read. "
                           "For best results, upload just the relevant section.)_")
     if not doc:
+        if path.lower().endswith(".pdf"):
+            try:
+                scanned = answer_scanned(question, path, mode)
+                if scanned:
+                    return scanned
+            except Exception as e:
+                print(f"[text] scanned-PDF fallback failed: {e}")
         return {"answer": "I couldn't read any text from this document (it may be a scanned image).",
                 "details": "", "models": config.VL_MODEL}
 

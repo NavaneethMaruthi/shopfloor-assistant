@@ -85,18 +85,54 @@ def dominant_color(path):
 
 def track(frames):
     """Centre of whatever differs from the static background (median of all frames).
-    Classic computer vision, no answers involved. Returns [(t, x, y)] in 0..1 units."""
+    Classic computer vision, no answers involved.
+    Returns ([(t, x, y)] in 0..1 units, average fraction of the frame that differs)."""
     if len(frames) < 3:
-        return []
+        return [], 0.0
     stack = np.stack([_small(f) for _, f in frames])
     background = np.median(stack, axis=0)
-    pts = []
+    pts, coverage = [], []
     for t, img in zip([t for t, _ in frames], stack):
         mask = np.abs(img - background).max(axis=2) > 40
+        coverage.append(mask.mean())
         if mask.sum() >= 4:
             ys, xs = np.nonzero(mask)
             pts.append((t, xs.mean() / mask.shape[1], ys.mean() / mask.shape[0]))
-    return pts
+    return pts, float(np.mean(coverage))
+
+
+def _shift(a, b, max_dx=6, max_dy=4):
+    """How far the picture content moved from a to b, in small-frame pixels (+x right, +y down)."""
+    h, w = a.shape
+    best = (float("inf"), 0, 0)
+    for dy in range(-max_dy, max_dy + 1):
+        for dx in range(-max_dx, max_dx + 1):
+            A = a[max(0, -dy):h - max(0, dy), max(0, -dx):w - max(0, dx)]
+            B = b[max(0, dy):h - max(0, -dy), max(0, dx):w - max(0, -dx)]
+            d = float(np.abs(A - B).mean())
+            if d < best[0]:
+                best = (d, dx, dy)
+    return best[1], best[2]
+
+
+def camera_hint(frames):
+    """For a moving camera (pan or tilt): total shift of the whole picture across the clip."""
+    step = max(1, len(frames) // 40)
+    grays = [_small(f).mean(axis=2) for _, f in frames[::step]]
+    tx = ty = 0
+    for a, b in zip(grays, grays[1:]):
+        dx, dy = _shift(a, b)
+        tx, ty = tx + dx, ty + dy
+    fx, fy = tx / grays[0].shape[1], ty / grays[0].shape[0]
+    parts = []
+    if abs(fx) > 0.1:
+        parts.append(f"the picture slides {'right' if fx > 0 else 'left'} (the camera pans {'left' if fx > 0 else 'right'})")
+    if abs(fy) > 0.1:
+        parts.append(f"the picture slides {'down' if fy > 0 else 'up'} (the camera tilts {'up' if fy > 0 else 'down'})")
+    if not parts:
+        return ("Motion measurement: most of the frame changes, so the camera itself is moving or shaking, "
+                "but it ends up roughly where it started. Describe object motion only if clearly visible.")
+    return "Motion measurement: most of the frame changes, so the camera is moving: " + " and ".join(parts) + "."
 
 
 def direction_hint(pts):
@@ -109,10 +145,10 @@ def direction_hint(pts):
         parts.append("down" if dy > 0 else "up")
     if abs(dx) > 0.1:
         parts.append("right" if dx > 0 else "left")
-    direction = " and ".join(parts) if parts else "barely moved"
+    movement = f"moved {' and '.join(parts)}" if parts else "barely moved"
     return (f"Motion tracker: the moving object's centre went from {x0:.0%} across, {y0:.0%} down "
-            f"at t={t0:.1f}s to {x1:.0%} across, {y1:.0%} down at t={t1:.1f}s, so it moved "
-            f"{direction} (viewer's point of view).")
+            f"at t={t0:.1f}s to {x1:.0%} across, {y1:.0%} down at t={t1:.1f}s, so it {movement} "
+            f"(viewer's point of view).")
 
 
 def bounce_hint(pts):
@@ -139,11 +175,12 @@ def color_hint(frames):
 
 
 def measurements(frames, q):
-    pts = track(frames) if (MOTION_RE.search(q) or BOUNCE_RE.search(q)) else []
+    pts, coverage = track(frames) if (MOTION_RE.search(q) or BOUNCE_RE.search(q)) else ([], 0.0)
+    camera_moving = coverage > 0.3   # most of the picture changes -> the camera moves, not one object
     hints = []
     if MOTION_RE.search(q):
-        hints.append(direction_hint(pts))
-    if BOUNCE_RE.search(q):
+        hints.append(camera_hint(frames) if camera_moving else direction_hint(pts))
+    if BOUNCE_RE.search(q) and not camera_moving:
         hints.append(bounce_hint(pts))
     if COLOR_RE.search(q):
         hints.append(color_hint(frames))
