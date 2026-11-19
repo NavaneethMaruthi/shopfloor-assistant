@@ -112,4 +112,10 @@ if __name__ == "__main__":
         print(f"Models ready in {router.warmup():.1f} s")
     except Exception as e:
         print(f"Warm-up failed: {e}\nIs Ollama running? Start it with: ollama serve")
-    build_ui().queue().launch(server_name="0.0.0.0", server_port=7860)
+    cert, key = os.path.join(config.ROOT, "cert.pem"), os.path.join(config.ROOT, "key.pem")
+    launch_kwargs = dict(server_name="0.0.0.0", server_port=7860)
+    if os.path.exists(cert) and os.path.exists(key):
+        # HTTPS so phones allow the microphone and camera (self-signed certificate)
+        launch_kwargs.update(ssl_certfile=cert, ssl_keyfile=key, ssl_verify=False)
+        print("HTTPS on: open https://<this-mac's-IP>:7860 on your phone (accept the certificate warning)")
+    build_ui().queue().launch(**launch_kwargs)
