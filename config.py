@@ -29,6 +29,7 @@ THINK_IMAGE = os.environ.get("THINK_IMAGE", "0") == "1"
 THINK_VIDEO = os.environ.get("THINK_VIDEO", "0") == "1"
 
 # --- Text (documents) ---
+MAX_DOC_CHARS = 24000     # ~6k tokens; longer documents are cut (with a note) instead of crashing
 TEXT_VERIFY = os.environ.get("TEXT_VERIFY", "1") == "1"   # second check that the quote really answers the question
 QUOTE_MATCH_MIN = 85                                       # fuzzy match score for "quote is really in the document"
 

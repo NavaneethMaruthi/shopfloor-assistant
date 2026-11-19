@@ -186,6 +186,39 @@ def make_grid(kept):
     return buf.getvalue(), grid.size
 
 
+def has_audio(path):
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries",
+                        "stream=codec_type", "-of", "csv=p=0", path], capture_output=True, text=True)
+    return "audio" in r.stdout
+
+
+def audio_summary(path):
+    """If the video has sound, classify it (and transcribe speech) with the audio pipeline."""
+    if not has_audio(path):
+        return ""
+    try:
+        import soundfile as sf
+        from handlers import audio
+        wav = audio.to_wav16k(path)
+        try:
+            samples, _ = sf.read(wav, dtype="float32")
+            if len(samples) < 1600 or float(abs(samples).max()) < 1e-3:  # silent track
+                return ""
+            labels = audio.classify(samples)
+            text = f"Sounds detected in the video's audio track: " + ", ".join(
+                f"{l} ({sc:.2f})" for l, sc in labels[:5]) + "."
+            if audio.is_speech(labels):
+                said = audio.transcribe(wav)
+                if said:
+                    text += f' Speech in the video: "{said}"'
+            return text
+        finally:
+            os.remove(wav)
+    except Exception as e:  # never let the audio side break video answers
+        print(f"[video] audio track skipped: {e}")
+        return ""
+
+
 def handle(question, path, mode="General"):
     q = (question or "").strip() or "Describe what happens in this video."
     tmpdir = tempfile.mkdtemp()
@@ -198,6 +231,7 @@ def handle(question, path, mode="General"):
         grid, _size = make_grid(kept)
         duration = frames[-1][0]
         hint = measurements(frames, q)
+        sound = audio_summary(path)
         prompt = (
             f"The image is a grid of {len(kept)} frames from a {duration:.1f}-second video, in "
             "chronological order, read left to right then top to bottom (the thin gray gaps between frames are not part of the video). Each frame has a small black label "
@@ -212,6 +246,7 @@ def handle(question, path, mode="General"):
             "as a digit. For movement, compare positions between the first and last frames. "
             "For text or signs, copy the words exactly.\n"
             + (f"{hint} These measurements come from analysing every frame; trust them.\n" if hint else "")
+            + (f"{sound} Use this for questions about sound or noise.\n" if sound else "")
             + f"Question: {q}"
         )
         reply = llm.chat(config.VL_MODEL, prompt, system=prompts.system_for(mode),
@@ -222,6 +257,8 @@ def handle(question, path, mode="General"):
         details = f"🎞️ Analysed {len(kept)} key frames out of {len(frames)} sampled"
         if hint:
             details += "\n\n" + hint
+        if sound:
+            details += "\n\n🔊 " + sound
         if notes:
             details += "\n\n" + notes
         return {"answer": answer, "details": details, "models": config.VL_MODEL}

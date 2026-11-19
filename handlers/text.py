@@ -78,6 +78,11 @@ def _verify(question, answer, quote):
 def handle(question, path, mode="General"):
     q = (question or "").strip() or "Summarise this document in a few sentences."
     doc = load_document(path)
+    truncated_note = ""
+    if len(doc) > config.MAX_DOC_CHARS:
+        doc = doc[:config.MAX_DOC_CHARS]
+        truncated_note = ("\n\n_(Long document: only the first part was read. "
+                          "For best results, upload just the relevant section.)_")
     if not doc:
         return {"answer": "I couldn't read any text from this document (it may be a scanned image).",
                 "details": "", "models": config.VL_MODEL}
@@ -85,7 +90,7 @@ def handle(question, path, mode="General"):
     if not (question or "").strip():  # no question: plain summary
         summary = llm.chat(config.VL_MODEL, f"DOCUMENT:\n<<<\n{doc}\n>>>\n\n{q}",
                            system=prompts.system_for(mode), think=False)
-        return {"answer": summary, "details": "", "models": config.VL_MODEL}
+        return {"answer": summary, "details": truncated_note.strip(), "models": config.VL_MODEL}
 
     raw = llm.chat(
         config.VL_MODEL,
@@ -98,7 +103,7 @@ def handle(question, path, mode="General"):
     not_found = prompts.not_found_message(mode)
 
     if not answer or answer.upper().startswith("NOT_FOUND"):
-        return {"answer": not_found, "details": "", "grounded": False, "models": config.VL_MODEL}
+        return {"answer": not_found, "details": truncated_note.strip(), "grounded": False, "models": config.VL_MODEL}
 
     if not _quote_in_doc(quote, doc):
         # model's quote isn't really in the document -> don't trust the answer
@@ -109,5 +114,5 @@ def handle(question, path, mode="General"):
         return {"answer": not_found, "details": f"_(Rejected candidate “{answer}” with quote “{quote}”: the check said it doesn't answer this question.)_",
                 "grounded": False, "models": config.VL_MODEL}
 
-    return {"answer": answer, "details": f"📄 Source: “{quote}”", "grounded": True,
+    return {"answer": answer, "details": f"📄 Source: “{quote}”" + truncated_note, "grounded": True,
             "models": config.VL_MODEL}
