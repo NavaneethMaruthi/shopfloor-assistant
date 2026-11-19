@@ -33,6 +33,9 @@ MAX_DOC_CHARS = 24000     # ~6k tokens; longer documents are cut (with a note) i
 TEXT_VERIFY = os.environ.get("TEXT_VERIFY", "1") == "1"   # second check that the quote really answers the question
 QUOTE_MATCH_MIN = 85                                       # fuzzy match score for "quote is really in the document"
 
+# --- Voice questions ---
+VOICE_SILENCE_S = float(os.environ.get("VOICE_SILENCE_S", "2"))   # stop recording after this much silence
+
 # --- Code ---
 CODE_MAX_REPAIRS = 2      # retries when the code fails the examples in the prompt
 CODE_TIMEOUT_S = 10

@@ -61,8 +61,8 @@ def is_speech(labels):
     return speech_mass > 0.4
 
 
-def transcribe(wav_path):
-    segments, _info = _whisper().transcribe(wav_path, beam_size=5)
+def transcribe(wav_path, prompt=None, language=None):
+    segments, _info = _whisper().transcribe(wav_path, beam_size=5, initial_prompt=prompt, language=language)
     return " ".join(s.text.strip() for s in segments).strip()
 
 

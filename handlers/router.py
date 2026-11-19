@@ -48,9 +48,13 @@ def handle(question, path=None, mode="General", context=""):
         modality = "chat"
 
     if modality == "chat":
+        note = ""
+        if (mode or "").lower().startswith("tech"):
+            note = ("_⚠️ No document loaded: this is general guidance, not from your manual. "
+                    "Attach the manual for answers with sources._")
         result = {"answer": llm.chat(config.VL_MODEL, prompts.context_block(context) + (question or "Hello"),
                                      system=prompts.system_for(mode), think=False),
-                  "details": "", "models": config.VL_MODEL}
+                  "details": note, "models": config.VL_MODEL}
     else:
         result = HANDLERS[modality].handle(question, path, mode, context=context)
 
