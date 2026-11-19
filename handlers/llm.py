@@ -8,6 +8,12 @@ from PIL import Image, ImageOps
 
 import config
 
+try:  # iPhone photos (HEIC/HEIF)
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:
+    pass
+
 _THINK_RE = re.compile(r"<think>.*?</think>", re.S)
 
 

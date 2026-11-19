@@ -66,7 +66,7 @@ def transcribe(wav_path):
     return " ".join(s.text.strip() for s in segments).strip()
 
 
-def handle(question, path, mode="General"):
+def handle(question, path, mode="General", context=""):
     q = (question or "").strip()
     wav = to_wav16k(path)
     try:
@@ -87,7 +87,7 @@ def handle(question, path, mode="General"):
                 f'"""{transcript}"""\n\n'
                 "Answer the question using only the transcript. Be concise. "
                 "If the transcript does not contain the answer, say so.\n"
-                f"Question: {q}",
+                f"{prompts.context_block(context)}Question: {q}",
                 system=prompts.system_for(mode),
                 think=False,
             )
@@ -109,7 +109,7 @@ def handle(question, path, mode="General"):
             "= ocean waves; 'Bark' + 'Dog' = a dog barking).\n"
             "Answer in ONE short sentence that names the sound (e.g. 'This is a dog barking.'). "
             "Only mention uncertainty if no specific label fits.\n"
-            f"Question: {q}",
+            f"{prompts.context_block(context)}Question: {q}",
             system=prompts.system_for(mode),
             think=False,
         )

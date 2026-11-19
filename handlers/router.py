@@ -8,7 +8,7 @@ import prompts
 from handlers import audio, code, image, llm, text, video
 
 EXTENSIONS = {
-    "image": {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"},
+    "image": {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".heic", ".heif"},
     "audio": {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".aac"},
     "video": {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"},
     "text": {".txt", ".pdf", ".md"},
@@ -34,7 +34,7 @@ def is_code_request(question):
     return bool(question and CODE_RE.search(question))
 
 
-def handle(question, path=None, mode="General"):
+def handle(question, path=None, mode="General", context=""):
     t0 = time.time()
     if path:
         modality = detect(path)
@@ -48,11 +48,11 @@ def handle(question, path=None, mode="General"):
         modality = "chat"
 
     if modality == "chat":
-        result = {"answer": llm.chat(config.VL_MODEL, question or "Hello",
+        result = {"answer": llm.chat(config.VL_MODEL, prompts.context_block(context) + (question or "Hello"),
                                      system=prompts.system_for(mode), think=False),
                   "details": "", "models": config.VL_MODEL}
     else:
-        result = HANDLERS[modality].handle(question, path, mode)
+        result = HANDLERS[modality].handle(question, path, mode, context=context)
 
     result["modality"] = modality
     result["latency"] = time.time() - t0

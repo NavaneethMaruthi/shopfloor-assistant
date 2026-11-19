@@ -106,23 +106,28 @@ def self_check(code, prompt):
     return True, "", stats["attempted"]
 
 
-def generate(prompt, previous=None, error=None):
+def generate(prompt, previous=None, error=None, context=""):
+    ctx = (f"Context from this session:\n{context}\n"
+           "If the request refers to a value from this context (e.g. 'this nameplate's rated current'), "
+           "build that exact value into the function as a default parameter, e.g. "
+           "def check(measured, rated=3.5). Do not ask for a dictionary or other input format.\n\n"
+           if context else "")
     if previous is None:
-        user = prompt
+        user = ctx + prompt
     else:
-        user = (f"{prompt}\n\nYour previous code:\n```python\n{previous}\n```\n"
+        user = (f"{ctx}{prompt}\n\nYour previous code:\n```python\n{previous}\n```\n"
                 f"It failed with:\n{error}\n\nFix the code. Reply with a single python code block.")
     return extract_code(llm.chat(config.CODE_MODEL, user, system=SYSTEM))
 
 
-def handle(question, path=None, mode="General"):
+def handle(question, path=None, mode="General", context=""):
     prompt = (question or "").strip()
-    code = generate(prompt)
+    code = generate(prompt, context=context)
     ok, report, n_ex = self_check(code, prompt)
     repairs = 0
     while not ok and repairs < config.CODE_MAX_REPAIRS:
         repairs += 1
-        code = generate(prompt, previous=code, error=report)
+        code = generate(prompt, previous=code, error=report, context=context)
         ok, report, n_ex = self_check(code, prompt)
 
     if ok and n_ex:

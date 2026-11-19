@@ -85,7 +85,7 @@ def _verify(question, answer, quote):
     return reply.strip().upper().startswith("YES")
 
 
-def handle(question, path, mode="General"):
+def handle(question, path, mode="General", context=""):
     q = (question or "").strip() or "Summarise this document in a few sentences."
     doc = load_document(path)
     truncated_note = ""
@@ -104,7 +104,10 @@ def handle(question, path, mode="General"):
 
     raw = llm.chat(
         config.VL_MODEL,
-        f"DOCUMENT:\n<<<\n{doc}\n>>>\n\nQUESTION: {q}",
+        f"DOCUMENT:\n<<<\n{doc}\n>>>\n"
+        + (f"\nSESSION NOTES (from other files, NOT part of the document; use them only to understand "
+           f"what the user refers to, e.g. a model number):\n{context}\n" if context else "")
+        + f"\nQUESTION: {q}",
         system=SYSTEM,
         json_mode=True,
         think=False,

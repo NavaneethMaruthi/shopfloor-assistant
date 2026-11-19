@@ -12,11 +12,11 @@ INSTRUCTIONS = (
 )
 
 
-def handle(question, path, mode="General"):
+def handle(question, path, mode="General", context=""):
     q = (question or "").strip() or "Describe this image in detail."
     answer = llm.chat(
         config.VL_MODEL,
-        f"{INSTRUCTIONS}\nQuestion: {q}",
+        f"{INSTRUCTIONS}{prompts.context_block(context)}\nQuestion: {q}",
         system=prompts.system_for(mode),
         images=[llm.image_bytes(path)],
         think=config.THINK_IMAGE,

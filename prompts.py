@@ -25,3 +25,11 @@ def not_found_message(mode: str) -> str:
         return ("The document does not say. Check the manufacturer's manual or ask your "
                 "supervisor before proceeding.")
     return "The document does not say."
+
+
+def context_block(context: str) -> str:
+    """Earlier turns of this session (Technician mode only), so files can be used together."""
+    if not context:
+        return ""
+    return ("\nEarlier in this session (other files and answers the user has already seen; use them "
+            "only if relevant to this question, e.g. a model number or rating):\n" + context + "\n\n")

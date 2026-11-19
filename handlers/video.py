@@ -221,7 +221,7 @@ def audio_summary(path):
         return ""
 
 
-def handle(question, path, mode="General"):
+def handle(question, path, mode="General", context=""):
     q = (question or "").strip() or "Describe what happens in this video."
     tmpdir = tempfile.mkdtemp()
     try:
@@ -249,6 +249,7 @@ def handle(question, path, mode="General"):
             "For text or signs, copy the words exactly.\n"
             + (f"{hint} These measurements come from analysing every frame; trust them.\n" if hint else "")
             + (f"{sound} Use this for questions about sound or noise.\n" if sound else "")
+            + prompts.context_block(context)
             + f"Question: {q}"
         )
         reply = llm.chat(config.VL_MODEL, prompt, system=prompts.system_for(mode),
@@ -262,7 +263,7 @@ def handle(question, path, mode="General"):
         if sound:
             details += "\n\n🔊 " + sound
         if notes:
-            details += "\n\n" + notes
+            details += "\n\n<details><summary>Frame-by-frame notes</summary>\n\n" + notes + "\n\n</details>"
         return {"answer": answer, "details": details, "models": config.VL_MODEL}
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
