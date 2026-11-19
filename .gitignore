@@ -3,3 +3,4 @@ data/
 __pycache__/
 *.pem
 .DS_Store
+demo_assets/
